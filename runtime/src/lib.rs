@@ -287,7 +287,7 @@ construct_runtime!(
 		TransactionPayment: pallet_transaction_payment,
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
-		TemplateModule: pallet_kitties,
+		Kitties: pallet_kitties::{Pallet, Storage, Event<T>},
 	}
 );
 
@@ -330,7 +330,7 @@ mod benches {
 		[frame_system, SystemBench::<Runtime>]
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
-		[pallet_template, TemplateModule]
+		[pallet_template, Kitties]
 	);
 }
 

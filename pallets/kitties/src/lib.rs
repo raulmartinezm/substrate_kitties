@@ -10,15 +10,18 @@ mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
+	use codec::EncodeLike;
 	use frame_support::pallet_prelude::*;
+	use frame_support::{pallet_prelude::*, traits::Randomness};
 	use frame_system::pallet_prelude::*;
+	use sp_io::hashing::blake2_128;
 
 	#[derive(Encode, Decode, MaxEncodedLen, RuntimeDebug, Clone, TypeInfo, PartialEq, Eq)]
 	pub struct Kitty(pub [u8; 16]);
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: frame_system::Config + pallet_randomness_collective_flip::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 	}
@@ -38,7 +41,7 @@ pub mod pallet {
 		Blake2_128Concat,
 		T::AccountId,
 		Blake2_128Concat,
-		i32,
+		u32,
 		Kitty,
 		OptionQuery,
 	>;
@@ -50,6 +53,7 @@ pub mod pallet {
 	// Pallets use events to inform users when important changes are made.
 	// https://docs.substrate.io/v3/runtime/events-and-errors
 	#[pallet::event]
+	// #[pallet::metadata(T::AccountId = "AccountId")] // Fails if uncommented
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// Event documentation should end with an array that provides descriptive names for event
@@ -71,19 +75,35 @@ pub mod pallet {
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// https://docs.substrate.io/v3/runtime/origins
-			let who = ensure_signed(origin)?;
-			Ok(())
-		}
+		#[pallet::weight(1000)]
+		pub fn create(origin: OriginFor<T>) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
 
-		/// An example dispatchable that may throw a custom error.
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
+			// Ensure kitty_id does not overflow
+			// return Err(ArithmethicError::Overflow.into());
+
+			let payload = (
+				<pallet_randomness_collective_flip::Pallet<T> as Randomness<
+					T::Hash,
+					T::BlockNumber,
+				>>::random_seed()
+				.0,
+				&sender,
+				<frame_system::Pallet<T>>::extrinsic_index(),
+			);
+
+			let dna = payload.using_encoded(blake2_128);
+
+			// Create and store kitty
+			let kitty = Kitty(dna);
+			let kitty_id = Self::next_kitty_id();
+			Kitties::<T>::insert(&sender, kitty_id, kitty.clone());
+			NextKittyId::<T>::put(kitty_id);
+
+			// Emit event
+
+			Self::deposit_event(Event::KittyCreated(sender, kitty_id, kitty));
+
 			Ok(())
 		}
 	}
