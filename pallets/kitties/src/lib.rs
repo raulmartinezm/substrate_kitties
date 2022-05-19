@@ -15,6 +15,7 @@ pub mod pallet {
 	use frame_support::{pallet_prelude::*, traits::Randomness};
 	use frame_system::pallet_prelude::*;
 	use sp_io::hashing::blake2_128;
+	use sp_runtime::ArithmeticError;
 
 	#[derive(Encode, Decode, MaxEncodedLen, RuntimeDebug, Clone, TypeInfo, PartialEq, Eq)]
 	pub struct Kitty(pub [u8; 16]);
@@ -80,7 +81,11 @@ pub mod pallet {
 			let sender = ensure_signed(origin)?;
 
 			// Ensure kitty_id does not overflow
-			// return Err(ArithmethicError::Overflow.into());
+			let kitty_id = Self::next_kitty_id();
+			let next_kitty_id = match kitty_id.checked_add(1) {
+				Some(number) => number,
+				None => return Err(ArithmeticError::Overflow.into()),
+			};
 
 			let payload = (
 				<pallet_randomness_collective_flip::Pallet<T> as Randomness<
@@ -96,9 +101,9 @@ pub mod pallet {
 
 			// Create and store kitty
 			let kitty = Kitty(dna);
-			let kitty_id = Self::next_kitty_id();
 			Kitties::<T>::insert(&sender, kitty_id, kitty.clone());
-			NextKittyId::<T>::put(kitty_id);
+
+			NextKittyId::<T>::put(next_kitty_id);
 
 			// Emit event
 

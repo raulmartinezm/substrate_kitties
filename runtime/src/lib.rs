@@ -287,7 +287,7 @@ construct_runtime!(
 		TransactionPayment: pallet_transaction_payment,
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
-		Kitties: pallet_kitties::{Pallet, Storage, Event<T>},
+		Kitties: pallet_kitties::{Pallet, Storage, Event<T>, Call},
 	}
 );
 
